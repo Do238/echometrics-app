@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>WellSpoken Desktop</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #0f172a;
+      color: #f8fafc;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 20px;
+    }
+    .container {
+      max-width: 600px;
+      width: 100%;
+      background: #1e293b;
+      padding: 30px;
+      border-radius: 12px;
+      text-align: center;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+    }
+    h1 { margin-bottom: 8px; color: #38bdf8; }
+    p.subtitle { margin-bottom: 24px; color: #94a3b8; font-size: 14px; }
+    button {
+      background-color: #0284c7;
+      color: white;
+      border: none;
+      padding: 12px 28px;
+      font-size: 16px;
+      font-weight: bold;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    button:hover { background-color: #0369a1; }
+    button.recording { background-color: #ef4444; }
+    .output-box {
+      margin-top: 20px;
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 16px;
+      min-height: 150px;
+      text-align: left;
+      color: #e2e8f0;
+      line-height: 1.5;
+      overflow-y: auto;
+      max-height: 250px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>WellSpoken Assistant</h1>
+    <p class="subtitle">Desktop speech practice app</p>
+
+    <button id="recordBtn">Start Recording</button>
+    <div id="output" class="output-box">Click "Start Recording" and speak into your microphone...</div>
+  </div>
+
+  <script>
+    const btn = document.getElementById('recordBtn');
+    const output = document.getElementById('output');
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    if (SpeechRecognition) {
+      const recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      let isListening = false;
+
+      btn.onclick = () => {
+        if (!isListening) {
+          recognition.start();
+          btn.textContent = 'Stop Recording';
+          btn.classList.add('recording');
+          output.textContent = 'Listening...';
+        } else {
+          recognition.stop();
+          btn.textContent = 'Start Recording';
+          btn.classList.remove('recording');
+        }
+        isListening = !isListening;
+      };
+
+      recognition.onresult = (e) => {
+        let text = '';
+        for (let i = 0; i < e.results.length; i++) {
+          text += e.results[i][0].transcript;
+        }
+        output.textContent = text;
+      };
+
+      recognition.onerror = (e) => {
+        output.textContent = 'Microphone or recognition error: ' + e.error;
+      };
+    } else {
+      output.textContent = 'Speech Recognition is not natively supported in this runtime built-in.';
+    }
+  </script>
+</body>
+</html>
