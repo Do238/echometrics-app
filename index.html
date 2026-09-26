@@ -2,106 +2,463 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Echometrics Desktop</title>
+  <title>EchoMetrics Studio</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: Arial, sans-serif;
       background-color: #0f172a;
       color: #f8fafc;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      min-height: 100vh;
-      padding: 20px;
+      padding: 24px;
     }
     .container {
-      max-width: 600px;
-      width: 100%;
+      max-width: 900px;
+      margin: 0 auto;
       background: #1e293b;
-      padding: 30px;
+      padding: 28px;
       border-radius: 12px;
-      text-align: center;
       box-shadow: 0 10px 25px rgba(0,0,0,0.3);
     }
-    h1 { margin-bottom: 8px; color: #38bdf8; }
-    p.subtitle { margin-bottom: 24px; color: #94a3b8; font-size: 14px; }
+    h1 { color: #38bdf8; margin-bottom: 4px; text-align: center; }
+    p.subtitle { color: #94a3b8; font-size: 14px; text-align: center; margin-bottom: 20px; }
+
+    /* Tabs */
+    .tab-bar {
+      display: flex;
+      gap: 4px;
+      border-bottom: 1px solid #334155;
+      margin-bottom: 20px;
+    }
+    .tab-btn {
+      background: none;
+      color: #94a3b8;
+      border: none;
+      border-bottom: 3px solid transparent;
+      padding: 10px 18px;
+      font-size: 14px;
+      font-weight: bold;
+      border-radius: 0;
+      cursor: pointer;
+    }
+    .tab-btn:hover { color: #e2e8f0; }
+    .tab-btn.active { color: #38bdf8; border-bottom-color: #38bdf8; }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    .api-config {
+      background: #0f172a;
+      padding: 14px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+    .api-config input {
+      flex: 1;
+      padding: 8px 12px;
+      border-radius: 6px;
+      border: 1px solid #334155;
+      background: #1e293b;
+      color: white;
+      font-size: 14px;
+    }
+
+    .topic-box {
+      background: #0f172a;
+      border: 1px solid #334155;
+      padding: 14px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+    }
+    .topic-box .topic-label { font-size: 12px; color: #94a3b8; text-transform: uppercase; margin-bottom: 4px; }
+    .topic-box .topic-text { font-size: 16px; color: #f8fafc; font-weight: bold; }
+    #newTopicBtn { background-color: #334155; font-size: 13px; padding: 8px 14px; white-space: nowrap; }
+
+    .video-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+    video {
+      width: 100%;
+      height: 220px;
+      background: #000;
+      border-radius: 8px;
+      border: 2px solid #334155;
+      object-fit: cover;
+    }
+    .controls { display: flex; gap: 12px; justify-content: center; margin-bottom: 20px; }
     button {
       background-color: #0284c7;
       color: white;
       border: none;
-      padding: 12px 28px;
-      font-size: 16px;
+      padding: 10px 20px;
+      font-size: 15px;
       font-weight: bold;
-      border-radius: 8px;
+      border-radius: 6px;
       cursor: pointer;
-      transition: background 0.2s;
     }
-    button:hover { background-color: #0369a1; }
+    button:disabled { background-color: #475569; cursor: not-allowed; }
     button.recording { background-color: #ef4444; }
-    .output-box {
-      margin-top: 20px;
+    #status { text-align: center; color: #cbd5e1; font-size: 14px; margin-bottom: 20px; }
+
+    .dashboard {
+      display: none;
       background: #0f172a;
       border: 1px solid #334155;
-      border-radius: 8px;
-      padding: 16px;
-      min-height: 150px;
-      text-align: left;
-      color: #e2e8f0;
-      line-height: 1.5;
-      overflow-y: auto;
-      max-height: 250px;
+      border-radius: 10px;
+      padding: 24px;
+      margin-top: 20px;
     }
+    .score-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid #334155;
+      padding-bottom: 16px;
+      margin-bottom: 20px;
+    }
+    .total-score { font-size: 32px; font-weight: bold; color: #38bdf8; }
+    .score-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+    .score-card {
+      background: #1e293b;
+      padding: 12px;
+      border-radius: 8px;
+      text-align: center;
+      border: 1px solid #334155;
+    }
+    .score-card h4 { font-size: 12px; color: #94a3b8; text-transform: uppercase; margin-bottom: 4px; }
+    .score-card p { font-size: 20px; font-weight: bold; color: #f8fafc; }
+
+    .section-title { font-size: 16px; color: #38bdf8; margin: 16px 0 8px 0; }
+    .box {
+      background: #1e293b;
+      padding: 14px;
+      border-radius: 8px;
+      font-size: 14px;
+      line-height: 1.5;
+      color: #e2e8f0;
+      margin-bottom: 16px;
+    }
+
+    textarea.box {
+      width: 100%;
+      min-height: 90px;
+      border: 1px solid #334155;
+      resize: vertical;
+      font-family: inherit;
+    }
+
+    .feedback-loop {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid #334155;
+      text-align: center;
+    }
+    .rate-btn { background-color: #334155; margin: 0 6px; padding: 8px 16px; font-size: 14px; }
   </style>
 </head>
 <body>
   <div class="container">
-    <h1>Echometrics Assistant</h1>
-    <p class="subtitle">Desktop speech practice app</p>
+    <h1>EchoMetrics Studio</h1>
+    <p class="subtitle">AI-Powered Speech & Rhetoric Coach</p>
 
-    <button id="recordBtn">Start Recording</button>
-    <div id="output" class="output-box">Click "Start Recording" and speak into your microphone...</div>
+    <div class="tab-bar">
+      <button class="tab-btn active" data-tab="practice">Practice</button>
+      <button class="tab-btn" data-tab="settings">Settings</button>
+    </div>
+
+    <!-- ============ PRACTICE TAB ============ -->
+    <div id="tab-practice" class="tab-panel active">
+
+      <div class="topic-box">
+        <div>
+          <div class="topic-label">Your topic</div>
+          <div class="topic-text" id="topicText">Loading topic...</div>
+        </div>
+        <button id="newTopicBtn">🎲 New Topic</button>
+      </div>
+
+      <div class="video-grid">
+        <div>
+          <p style="margin-bottom: 6px; font-size: 13px; color: #94a3b8;">Live Feed</p>
+          <video id="preview" autoplay muted></video>
+        </div>
+        <div>
+          <p style="margin-bottom: 6px; font-size: 13px; color: #94a3b8;">Recorded Playback</p>
+          <video id="playback" controls></video>
+        </div>
+      </div>
+
+      <div class="controls">
+        <button id="recordBtn">Start Recording</button>
+        <button id="downloadBtn" disabled>Save MP4 Video</button>
+      </div>
+
+      <p id="status">Click "Start Recording" to begin...</p>
+
+      <!-- Dashboard -->
+      <div id="dashboard" class="dashboard">
+        <div class="score-header">
+          <h2>Analysis Summary</h2>
+          <div class="total-score" id="totalScore">0 / 1000</div>
+        </div>
+
+        <div class="score-grid">
+          <div class="score-card"><h4>Structure</h4><p id="scoreStructure">0 / 250</p></div>
+          <div class="score-card"><h4>Conciseness</h4><p id="scoreConciseness">0 / 200</p></div>
+          <div class="score-card"><h4>Confidence</h4><p id="scoreConfidence">0 / 150</p></div>
+          <div class="score-card"><h4>Pronunciation</h4><p id="scorePronunciation">0 / 150</p></div>
+          <div class="score-card"><h4>Filler Rate</h4><p id="scoreFiller">0 / 150</p></div>
+          <div class="score-card"><h4>Pace</h4><p id="scorePace">0 / 100</p></div>
+        </div>
+
+        <div class="section-title">AI Transcribed Text (Editable)</div>
+        <textarea id="transcriptBox" class="box" placeholder="Transcribing audio with Hugging Face Whisper AI..."></textarea>
+        <button id="reanalyzeBtn" style="margin-bottom: 16px; font-size: 13px; padding: 6px 12px;">Re-analyze Text</button>
+
+        <div class="section-title">AI Coach Analysis</div>
+        <div id="aiAnalysisBox" class="box">Waiting for recording completion...</div>
+
+        <div class="feedback-loop">
+          <p style="font-size: 14px; margin-bottom: 12px; color: #94a3b8;">Was this AI analysis fair and accurate?</p>
+          <button class="rate-btn" id="fairBtn">👍 Fair</button>
+          <button class="rate-btn" id="unfairBtn">👎 Unfair</button>
+          <p id="feedbackResponse" style="font-size: 13px; margin-top: 8px; color: #38bdf8;"></p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ SETTINGS TAB ============ -->
+    <div id="tab-settings" class="tab-panel">
+      <div class="section-title" style="margin-top: 0;">API Configuration</div>
+      <div class="api-config">
+        <label for="hfKey" style="font-size: 13px; color: #94a3b8;">HuggingFace Key:</label>
+        <input type="password" id="hfKey" placeholder="Paste your hf_... access token here" />
+      </div>
+      <p style="font-size: 13px; color: #94a3b8;">Your key is stored locally on this device only and is sent directly to Hugging Face's API for transcription and coaching analysis.</p>
+    </div>
+
   </div>
 
   <script>
-    const btn = document.getElementById('recordBtn');
-    const output = document.getElementById('output');
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const { ipcRenderer } = require('electron');
 
-    if (SpeechRecognition) {
-      const recognition = new SpeechRecognition();
-      recognition.continuous = true;
-      recognition.interimResults = true;
-      let isListening = false;
+    // ---------- Tabs ----------
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+      });
+    });
 
-      btn.onclick = () => {
-        if (!isListening) {
-          recognition.start();
-          btn.textContent = 'Stop Recording';
-          btn.classList.add('recording');
-          output.textContent = 'Listening...';
-        } else {
-          recognition.stop();
-          btn.textContent = 'Start Recording';
-          btn.classList.remove('recording');
-        }
-        isListening = !isListening;
-      };
+    // ---------- Topic prompts ----------
+    const TOPICS = [
+      "Should schools replace exams with project-based assessments?",
+      "Describe a piece of technology that changed your daily life.",
+      "Is remote work better than working in an office?",
+      "Talk about a book, film, or show that changed how you think.",
+      "Should university education be free for everyone?",
+      "Describe your ideal city to live in and why.",
+      "Is social media doing more harm than good?",
+      "Talk about a skill everyone should learn before adulthood.",
+      "Should companies switch to a four-day work week?",
+      "Describe a challenge you overcame and what it taught you.",
+      "Is artificial intelligence a bigger opportunity or a bigger risk?",
+      "Should voting be mandatory in democratic countries?",
+      "Talk about a tradition from your culture that you value.",
+      "Is it better to specialize early or explore broadly in a career?",
+      "Should public transportation be free in major cities?",
+      "Describe a time you had to persuade someone to change their mind.",
+      "Is competition or collaboration more important for success?",
+      "Should self-driving cars be trusted on public roads today?",
+      "Talk about a habit that has improved your life.",
+      "Is it better to live in a small town or a big city?"
+    ];
+    let currentTopic = "";
+    const topicText = document.getElementById('topicText');
+    const newTopicBtn = document.getElementById('newTopicBtn');
 
-      recognition.onresult = (e) => {
-        let text = '';
-        for (let i = 0; i < e.results.length; i++) {
-          text += e.results[i][0].transcript;
-        }
-        output.textContent = text;
-      };
-
-      recognition.onerror = (e) => {
-        output.textContent = 'Microphone or recognition error: ' + e.error;
-      };
-    } else {
-      output.textContent = 'Speech Recognition is not natively supported in this runtime built-in.';
+    function pickRandomTopic() {
+      currentTopic = TOPICS[Math.floor(Math.random() * TOPICS.length)];
+      topicText.textContent = currentTopic;
     }
+    newTopicBtn.onclick = pickRandomTopic;
+
+    // ---------- Recording / analysis ----------
+    const recordBtn = document.getElementById('recordBtn');
+    const downloadBtn = document.getElementById('downloadBtn');
+    const reanalyzeBtn = document.getElementById('reanalyzeBtn');
+    const preview = document.getElementById('preview');
+    const playback = document.getElementById('playback');
+    const status = document.getElementById('status');
+    const dashboard = document.getElementById('dashboard');
+    const hfKeyInput = document.getElementById('hfKey');
+    const transcriptBox = document.getElementById('transcriptBox');
+
+    let mediaRecorder;
+    let recordedChunks = [];
+    let recordedBlob = null;
+    let isRecording = false;
+    let startTime, endTime;
+
+    async function setupCamera() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+        preview.srcObject = stream;
+        mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
+
+        mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) recordedChunks.push(e.data); };
+        mediaRecorder.onstop = () => {
+          recordedBlob = new Blob(recordedChunks, { type: 'video/webm' });
+          playback.src = URL.createObjectURL(recordedBlob);
+          recordedChunks = [];
+          downloadBtn.disabled = false;
+          status.textContent = 'Recording complete!';
+          processAudioAndAnalyze();
+        };
+      } catch (err) {
+        status.textContent = 'Error accessing media: ' + err.message;
+      }
+    }
+
+    recordBtn.onclick = () => {
+      if (!mediaRecorder) return;
+
+      if (!isRecording) {
+        recordedChunks = [];
+        startTime = Date.now();
+        mediaRecorder.start();
+
+        isRecording = true;
+        dashboard.style.display = 'none';
+        recordBtn.textContent = 'Stop Recording';
+        recordBtn.classList.add('recording');
+        downloadBtn.disabled = true;
+        status.textContent = 'Recording video & audio...';
+      } else {
+        endTime = Date.now();
+        mediaRecorder.stop();
+
+        isRecording = false;
+        recordBtn.textContent = 'Start Recording';
+        recordBtn.classList.remove('recording');
+      }
+    };
+
+    downloadBtn.onclick = async () => {
+      if (!recordedBlob) return;
+      status.textContent = 'Converting video to MP4...';
+      const arrayBuffer = await recordedBlob.arrayBuffer();
+      const result = await ipcRenderer.invoke('convert-to-mp4', arrayBuffer);
+      status.textContent = result.success ? 'Video saved as MP4!' : 'Save status: ' + result.message;
+    };
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const savedKey = localStorage.getItem('hf_api_key');
+      if (savedKey) hfKeyInput.value = savedKey;
+      pickRandomTopic();
+    });
+
+    hfKeyInput.addEventListener('input', () => {
+      localStorage.setItem('hf_api_key', hfKeyInput.value.trim());
+    });
+
+    async function processAudioAndAnalyze() {
+      dashboard.style.display = 'block';
+      const apiKey = hfKeyInput.value.trim();
+
+      const aiBox = document.getElementById('aiAnalysisBox');
+      transcriptBox.value = "Transcribing audio using Hugging Face Whisper AI...";
+      aiBox.textContent = "Waiting for transcript...";
+
+      // Step 1: Send Audio Buffer to Main Process for Whisper Speech Recognition
+      const audioArrayBuffer = await recordedBlob.arrayBuffer();
+      const sttResult = await ipcRenderer.invoke('transcribe-audio', { audioArrayBuffer, apiKey });
+
+      if (!sttResult.success) {
+        transcriptBox.value = "";
+        aiBox.textContent = "Speech Transcription Notice: " + sttResult.error;
+        return;
+      }
+
+      const transcribedText = sttResult.text ? sttResult.text.trim() : "";
+      transcriptBox.value = transcribedText || "No speech recognized in audio file.";
+
+      if (transcribedText) {
+        runMetricsAndCoach(transcribedText);
+      }
+    }
+
+    async function runMetricsAndCoach(currentText) {
+      const durationSec = Math.max(1, ((endTime || Date.now()) - (startTime || Date.now())) / 1000);
+      const apiKey = hfKeyInput.value.trim();
+      const words = currentText.split(/\s+/).filter(w => w.length > 0);
+      const wordCount = words.length;
+      const wpm = Math.round((wordCount / durationSec) * 60);
+
+      let fillerCount = 0;
+      const fillers = ['um', 'uh', 'like', 'you know', 'so', 'actually'];
+      words.forEach(w => { if (fillers.includes(w.toLowerCase())) fillerCount++; });
+
+      const paceScore = Math.max(20, Math.min(100, 100 - Math.abs(140 - wpm)));
+      const fillerScore = Math.max(30, Math.min(150, 150 - (fillerCount * 15)));
+      const concisenessScore = Math.min(200, Math.max(80, 200 - Math.floor(wordCount / 10)));
+      const structureScore = Math.min(250, 150 + Math.floor(wordCount / 2));
+      const confidenceScore = wordCount > 10 ? 130 : 60;
+      const pronunciationScore = wordCount > 10 ? 135 : 65;
+
+      const totalScore = paceScore + fillerScore + concisenessScore + structureScore + confidenceScore + pronunciationScore;
+
+      document.getElementById('totalScore').textContent = `${totalScore} / 1000`;
+      document.getElementById('scoreStructure').textContent = `${structureScore} / 250`;
+      document.getElementById('scoreConciseness').textContent = `${concisenessScore} / 200`;
+      document.getElementById('scoreConfidence').textContent = `${confidenceScore} / 150`;
+      document.getElementById('scorePronunciation').textContent = `${pronunciationScore} / 150`;
+      document.getElementById('scoreFiller').textContent = `${fillerScore} / 150`;
+      document.getElementById('scorePace').textContent = `${paceScore} / 100`;
+
+      // Step 2: Send Text (+ topic) to Main Process for AI Analysis
+      const aiBox = document.getElementById('aiAnalysisBox');
+      aiBox.textContent = "Generating AI Coach Feedback...";
+
+      const coachResult = await ipcRenderer.invoke('analyze-speech', { transcript: currentText, apiKey, topic: currentTopic });
+
+      if (coachResult.success) {
+        aiBox.innerHTML = coachResult.text.replace(/\n/g, '<br>');
+      } else {
+        aiBox.textContent = "AI Analysis Error: " + coachResult.error;
+      }
+    }
+
+    reanalyzeBtn.onclick = () => {
+      const text = transcriptBox.value.trim();
+      if (text) {
+        runMetricsAndCoach(text);
+      }
+    };
+
+    document.getElementById('fairBtn').onclick = () => {
+      document.getElementById('feedbackResponse').textContent = 'Feedback saved!';
+    };
+    document.getElementById('unfairBtn').onclick = () => {
+      document.getElementById('feedbackResponse').textContent = 'Feedback noted for future tuning.';
+    };
+
+    setupCamera();
   </script>
 </body>
 </html>
