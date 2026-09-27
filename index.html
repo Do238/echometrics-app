@@ -127,7 +127,7 @@
     .total-score { font-size: 32px; font-weight: bold; color: #38bdf8; }
     .score-grid {
       display: grid;
-      grid-template-columns: repeat(3, 1fr);
+      grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
       gap: 12px;
       margin-bottom: 24px;
     }
@@ -176,6 +176,7 @@
 
     <div class="tab-bar">
       <button class="tab-btn active" data-tab="practice">Practice</button>
+      <button class="tab-btn" data-tab="reading">Reading Outloud</button>
       <button class="tab-btn" data-tab="settings">Settings</button>
     </div>
 
@@ -207,12 +208,13 @@
       </div>
 
       <p id="status">Click "Start Recording" to begin...</p>
+      <p id="faceTrackStatus" style="text-align: center; color: #64748b; font-size: 12px; margin-top: -14px; margin-bottom: 20px;">Loading face tracking...</p>
 
       <!-- Dashboard -->
       <div id="dashboard" class="dashboard">
         <div class="score-header">
           <h2>Analysis Summary</h2>
-          <div class="total-score" id="totalScore">0 / 1000</div>
+          <div class="total-score" id="totalScore">0 / 1100</div>
         </div>
 
         <div class="score-grid">
@@ -222,7 +224,9 @@
           <div class="score-card"><h4>Pronunciation</h4><p id="scorePronunciation">0 / 150</p></div>
           <div class="score-card"><h4>Filler Rate</h4><p id="scoreFiller">0 / 150</p></div>
           <div class="score-card"><h4>Pace</h4><p id="scorePace">0 / 100</p></div>
+          <div class="score-card"><h4>Jaw &amp; Mouth</h4><p id="scoreJawMouth">0 / 100</p></div>
         </div>
+        <p id="faceTrackNote" style="font-size: 12px; color: #64748b; margin: -12px 0 20px 0; text-align: center;"></p>
 
         <div class="section-title">AI Transcribed Text (Editable)</div>
         <textarea id="transcriptBox" class="box" placeholder="Transcribing audio with Hugging Face Whisper AI..."></textarea>
@@ -236,6 +240,68 @@
           <button class="rate-btn" id="fairBtn">👍 Fair</button>
           <button class="rate-btn" id="unfairBtn">👎 Unfair</button>
           <p id="feedbackResponse" style="font-size: 13px; margin-top: 8px; color: #38bdf8;"></p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ READING OUTLOUD TAB ============ -->
+    <div id="tab-reading" class="tab-panel">
+
+      <div class="topic-box">
+        <div>
+          <div class="topic-label">Read this aloud</div>
+          <div class="topic-text" id="passageText" style="font-weight: normal; line-height: 1.5;">Loading passage...</div>
+        </div>
+        <button id="newPassageBtn">🎲 New Passage</button>
+      </div>
+
+      <div class="video-grid">
+        <div>
+          <p style="margin-bottom: 6px; font-size: 13px; color: #94a3b8;">Live Feed</p>
+          <video id="previewReading" autoplay muted></video>
+        </div>
+        <div>
+          <p style="margin-bottom: 6px; font-size: 13px; color: #94a3b8;">Recorded Playback</p>
+          <video id="playbackReading" controls></video>
+        </div>
+      </div>
+
+      <div class="controls">
+        <button id="recordBtn2">Start Recording</button>
+        <button id="downloadBtn2" disabled>Save MP4 Video</button>
+      </div>
+
+      <p id="status2">Click "Start Recording" and read the passage above...</p>
+      <p id="faceTrackStatus2" style="text-align: center; color: #64748b; font-size: 12px; margin-top: -14px; margin-bottom: 20px;">Loading face tracking...</p>
+
+      <!-- Reading Dashboard -->
+      <div id="dashboard2" class="dashboard">
+        <div class="score-header">
+          <h2>Reading Analysis</h2>
+          <div class="total-score" id="totalScore2">0 / 650</div>
+        </div>
+
+        <div class="score-grid">
+          <div class="score-card"><h4>Pronunciation</h4><p id="scorePronunciation2">0 / 150</p></div>
+          <div class="score-card"><h4>Confidence</h4><p id="scoreConfidence2">0 / 150</p></div>
+          <div class="score-card"><h4>Filler Rate</h4><p id="scoreFiller2">0 / 150</p></div>
+          <div class="score-card"><h4>Pace</h4><p id="scorePace2">0 / 100</p></div>
+          <div class="score-card"><h4>Jaw &amp; Mouth</h4><p id="scoreJawMouth2">0 / 100</p></div>
+        </div>
+        <p id="faceTrackNote2" style="font-size: 12px; color: #64748b; margin: -12px 0 20px 0; text-align: center;"></p>
+
+        <div class="section-title">AI Transcribed Text (Editable)</div>
+        <textarea id="transcriptBox2" class="box" placeholder="Transcribing audio with Hugging Face Whisper AI..."></textarea>
+        <button id="reanalyzeBtn2" style="margin-bottom: 16px; font-size: 13px; padding: 6px 12px;">Re-analyze Text</button>
+
+        <div class="section-title">AI Coach Analysis</div>
+        <div id="aiAnalysisBox2" class="box">Waiting for recording completion...</div>
+
+        <div class="feedback-loop">
+          <p style="font-size: 14px; margin-bottom: 12px; color: #94a3b8;">Was this AI analysis fair and accurate?</p>
+          <button class="rate-btn" id="fairBtn2">👍 Fair</button>
+          <button class="rate-btn" id="unfairBtn2">👎 Unfair</button>
+          <p id="feedbackResponse2" style="font-size: 13px; margin-top: 8px; color: #38bdf8;"></p>
         </div>
       </div>
     </div>
@@ -298,6 +364,147 @@
     }
     newTopicBtn.onclick = pickRandomTopic;
 
+    // ---------- Reading-aloud passages ----------
+    const READING_PASSAGES = [
+      "The morning market filled with the smell of fresh bread and roasted coffee. Vendors called out prices as shoppers wandered between wooden stalls, picking through baskets of ripe peaches and bright green apples.",
+      "A gentle rain tapped against the window as the old clock ticked in the hallway. She closed her book, stretched her arms, and watched the streetlights flicker on one by one down the quiet avenue.",
+      "Engineers tested the new bridge design by loading it with sandbags and measuring how much it bent. The results were promising, though the team agreed a second round of testing was still necessary.",
+      "The hikers reached the ridge just as the fog began to lift, revealing a valley dotted with farmhouses and grazing sheep. Someone pulled out a thermos and poured hot tea for everyone to share.",
+      "Before the concert began, the violinist tuned her instrument backstage while the stagehands adjusted the lighting rig. The audience murmured quietly, programs rustling as the house lights slowly dimmed.",
+      "The chef diced onions, garlic, and fresh basil, tossing them into a pan already sizzling with olive oil. Within minutes the kitchen smelled rich and savory, drawing curious guests toward the doorway.",
+      "Astronomers pointed their telescope toward the eastern horizon, hoping to catch a clear glimpse of the meteor shower. Clouds drifted past occasionally, but the night sky mostly stayed dark and still.",
+      "The librarian carefully repaired a torn page, smoothing tape along the crease before returning the book to its shelf. Sunlight streamed through tall windows, catching dust drifting lazily through the reading room."
+    ];
+    let currentPassage = "";
+    const passageText = document.getElementById('passageText');
+    const newPassageBtn = document.getElementById('newPassageBtn');
+
+    function pickRandomPassage() {
+      currentPassage = READING_PASSAGES[Math.floor(Math.random() * READING_PASSAGES.length)];
+      passageText.textContent = currentPassage;
+    }
+    newPassageBtn.onclick = pickRandomPassage;
+
+    // ---------- Face / jaw-mouth tracking ----------
+    // Uses MediaPipe's Face Landmarker (runs fully client-side on the webcam feed,
+    // no data leaves the machine). Loaded from a CDN, so it needs internet access
+    // once, the first time the app runs; after that the browser cache handles it.
+    let faceLandmarker = null;
+    let faceTrackingRafId = null;
+    let marSamples = [];      // mouth-aspect-ratio samples for this recording
+    let jawDeltas = [];       // frame-to-frame jaw movement magnitude
+    let lastJawRel = null;
+    let lastFaceMetrics = null; // aggregated metrics from the most recent recording
+
+    // Standard MediaPipe FaceMesh landmark indices (478-point model)
+    const LM = { MOUTH_LEFT: 61, MOUTH_RIGHT: 291, LIP_TOP: 13, LIP_BOTTOM: 14, JAW_CHIN: 152, NOSE_REF: 6 };
+
+    function dist2D(a, b) {
+      return Math.hypot(a.x - b.x, a.y - b.y);
+    }
+
+    async function initFaceLandmarker() {
+      const faceTrackStatus = document.getElementById('faceTrackStatus');
+      const faceTrackStatus2 = document.getElementById('faceTrackStatus2');
+      const setStatus = (msg) => {
+        if (faceTrackStatus) faceTrackStatus.textContent = msg;
+        if (faceTrackStatus2) faceTrackStatus2.textContent = msg;
+      };
+      try {
+        const visionModule = await import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/+esm');
+        const { FaceLandmarker, FilesetResolver } = visionModule;
+        const filesetResolver = await FilesetResolver.forVisionTasks(
+          'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm'
+        );
+        try {
+          faceLandmarker = await FaceLandmarker.createFromOptions(filesetResolver, {
+            baseOptions: {
+              modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task',
+              delegate: 'GPU'
+            },
+            runningMode: 'VIDEO',
+            numFaces: 1
+          });
+        } catch (gpuErr) {
+          // Fall back to CPU delegate on machines without WebGL/GPU support
+          faceLandmarker = await FaceLandmarker.createFromOptions(filesetResolver, {
+            baseOptions: {
+              modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task',
+              delegate: 'CPU'
+            },
+            runningMode: 'VIDEO',
+            numFaces: 1
+          });
+        }
+        setStatus('Face tracking ready (jaw & mouth movement).');
+      } catch (err) {
+        faceLandmarker = null;
+        setStatus('Face tracking unavailable (needs internet on first run) — Jaw & Mouth score will default to neutral.');
+      }
+    }
+
+    function trackFaceFrame() {
+      if (!isRecording) return;
+      if (faceLandmarker && preview.readyState >= 2) {
+        try {
+          const result = faceLandmarker.detectForVideo(preview, performance.now());
+          const lm = result && result.faceLandmarks && result.faceLandmarks[0];
+          if (lm) {
+            const mouthWidth = dist2D(lm[LM.MOUTH_LEFT], lm[LM.MOUTH_RIGHT]);
+            const mouthHeight = dist2D(lm[LM.LIP_TOP], lm[LM.LIP_BOTTOM]);
+            const mar = mouthWidth > 0 ? mouthHeight / mouthWidth : 0;
+            marSamples.push(mar);
+
+            const jawRel = { x: lm[LM.JAW_CHIN].x - lm[LM.NOSE_REF].x, y: lm[LM.JAW_CHIN].y - lm[LM.NOSE_REF].y };
+            if (lastJawRel) jawDeltas.push(dist2D(jawRel, lastJawRel));
+            lastJawRel = jawRel;
+          }
+        } catch (e) { /* skip a bad frame, keep going */ }
+      }
+      faceTrackingRafId = requestAnimationFrame(trackFaceFrame);
+    }
+
+    function aggregateFaceMetrics() {
+      if (marSamples.length === 0) return null;
+      const avgMAR = marSamples.reduce((a, b) => a + b, 0) / marSamples.length;
+      const maxMAR = Math.max(...marSamples);
+      const jitterAvg = jawDeltas.length ? jawDeltas.reduce((a, b) => a + b, 0) / jawDeltas.length : 0;
+      return { avgMAR, maxMAR, jitterAvg, frameCount: marSamples.length };
+    }
+
+    // Heuristic scoring: rewards a natural, moderate mouth-opening range and
+    // penalizes high jaw jitter (a proxy for clenching/tension). These thresholds
+    // are starting points — tune them if they don't match how your camera/lighting reads.
+    function computeJawMouthScore(metrics) {
+      if (!metrics || metrics.frameCount < 5) {
+        return { score: 50, opennessScore: 50, stabilityScore: 50, note: 'No reliable face-tracking data captured this take (check camera/lighting).' };
+      }
+      const { avgMAR, jitterAvg } = metrics;
+
+      let opennessScore;
+      if (avgMAR < 0.08) opennessScore = 45;
+      else if (avgMAR <= 0.45) opennessScore = 100 - Math.abs(avgMAR - 0.22) * 150;
+      else opennessScore = 100 - (avgMAR - 0.45) * 220;
+      opennessScore = Math.max(0, Math.min(100, opennessScore));
+
+      let stabilityScore = 100 - jitterAvg * 4000;
+      stabilityScore = Math.max(0, Math.min(100, stabilityScore));
+
+      const score = Math.round(opennessScore * 0.5 + stabilityScore * 0.5);
+      return { score, opennessScore: Math.round(opennessScore), stabilityScore: Math.round(stabilityScore), note: '' };
+    }
+
+    function buildVisionSummary(faceResult) {
+      if (!faceResult || faceResult.note) return 'No usable face-tracking data for this take (camera/lighting issue) — treat physical delivery as unknown.';
+      const opennessDesc = faceResult.opennessScore >= 75 ? 'natural, moderate mouth movement'
+        : faceResult.opennessScore >= 45 ? 'somewhat stiff or exaggerated mouth movement'
+        : 'mouth stayed very closed or opened very wide';
+      const stabilityDesc = faceResult.stabilityScore >= 75 ? 'jaw looked relaxed and stable'
+        : faceResult.stabilityScore >= 45 ? 'some jaw jitter/tension detected'
+        : 'noticeable jaw tension or clenching detected';
+      return `${opennessDesc}; ${stabilityDesc} (approximate, camera-based estimate).`;
+    }
+
     // ---------- Recording / analysis ----------
     const recordBtn = document.getElementById('recordBtn');
     const downloadBtn = document.getElementById('downloadBtn');
@@ -309,68 +516,106 @@
     const hfKeyInput = document.getElementById('hfKey');
     const transcriptBox = document.getElementById('transcriptBox');
 
+    const recordBtn2 = document.getElementById('recordBtn2');
+    const downloadBtn2 = document.getElementById('downloadBtn2');
+    const reanalyzeBtn2 = document.getElementById('reanalyzeBtn2');
+    const playbackReading = document.getElementById('playbackReading');
+    const status2 = document.getElementById('status2');
+    const dashboard2 = document.getElementById('dashboard2');
+    const transcriptBox2 = document.getElementById('transcriptBox2');
+
     let mediaRecorder;
     let recordedChunks = [];
     let recordedBlob = null;
     let isRecording = false;
     let startTime, endTime;
+    let recordingMode = 'practice'; // 'practice' | 'reading' — which tab started the current/last take
+
+    const modeEls = {
+      practice: { recordBtn, downloadBtn, status, dashboard, playback },
+      reading: { recordBtn: recordBtn2, downloadBtn: downloadBtn2, status: status2, dashboard: dashboard2, playback: playbackReading }
+    };
 
     async function setupCamera() {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
         preview.srcObject = stream;
+        const previewReadingEl = document.getElementById('previewReading');
+        if (previewReadingEl) previewReadingEl.srcObject = stream;
         mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
 
         mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) recordedChunks.push(e.data); };
         mediaRecorder.onstop = () => {
           recordedBlob = new Blob(recordedChunks, { type: 'video/webm' });
-          playback.src = URL.createObjectURL(recordedBlob);
+          const els = modeEls[recordingMode];
+          els.playback.src = URL.createObjectURL(recordedBlob);
           recordedChunks = [];
-          downloadBtn.disabled = false;
-          status.textContent = 'Recording complete!';
-          processAudioAndAnalyze();
+          els.downloadBtn.disabled = false;
+          els.status.textContent = 'Recording complete!';
+          if (recordingMode === 'practice') processAudioAndAnalyze();
+          else processReadingRecording();
         };
       } catch (err) {
         status.textContent = 'Error accessing media: ' + err.message;
+        status2.textContent = 'Error accessing media: ' + err.message;
       }
     }
 
-    recordBtn.onclick = () => {
-      if (!mediaRecorder) return;
+    function attachRecordHandler(mode) {
+      const els = modeEls[mode];
+      els.recordBtn.onclick = () => {
+        if (!mediaRecorder) return;
 
-      if (!isRecording) {
-        recordedChunks = [];
-        startTime = Date.now();
-        mediaRecorder.start();
+        if (!isRecording) {
+          recordingMode = mode;
+          recordedChunks = [];
+          marSamples = [];
+          jawDeltas = [];
+          lastJawRel = null;
+          startTime = Date.now();
+          mediaRecorder.start();
 
-        isRecording = true;
-        dashboard.style.display = 'none';
-        recordBtn.textContent = 'Stop Recording';
-        recordBtn.classList.add('recording');
-        downloadBtn.disabled = true;
-        status.textContent = 'Recording video & audio...';
-      } else {
-        endTime = Date.now();
-        mediaRecorder.stop();
+          isRecording = true;
+          els.dashboard.style.display = 'none';
+          els.recordBtn.textContent = 'Stop Recording';
+          els.recordBtn.classList.add('recording');
+          els.downloadBtn.disabled = true;
+          els.status.textContent = 'Recording video & audio...';
+          trackFaceFrame();
+        } else {
+          endTime = Date.now();
+          mediaRecorder.stop();
 
-        isRecording = false;
-        recordBtn.textContent = 'Start Recording';
-        recordBtn.classList.remove('recording');
-      }
-    };
+          isRecording = false;
+          els.recordBtn.textContent = 'Start Recording';
+          els.recordBtn.classList.remove('recording');
+          if (faceTrackingRafId) cancelAnimationFrame(faceTrackingRafId);
+          lastFaceMetrics = aggregateFaceMetrics();
+        }
+      };
+    }
+    attachRecordHandler('practice');
+    attachRecordHandler('reading');
 
-    downloadBtn.onclick = async () => {
-      if (!recordedBlob) return;
-      status.textContent = 'Converting video to MP4...';
-      const arrayBuffer = await recordedBlob.arrayBuffer();
-      const result = await ipcRenderer.invoke('convert-to-mp4', arrayBuffer);
-      status.textContent = result.success ? 'Video saved as MP4!' : 'Save status: ' + result.message;
-    };
+    function attachDownloadHandler(mode) {
+      const els = modeEls[mode];
+      els.downloadBtn.onclick = async () => {
+        if (!recordedBlob) return;
+        els.status.textContent = 'Converting video to MP4...';
+        const arrayBuffer = await recordedBlob.arrayBuffer();
+        const result = await ipcRenderer.invoke('convert-to-mp4', arrayBuffer);
+        els.status.textContent = result.success ? 'Video saved as MP4!' : 'Save status: ' + result.message;
+      };
+    }
+    attachDownloadHandler('practice');
+    attachDownloadHandler('reading');
 
     document.addEventListener('DOMContentLoaded', () => {
       const savedKey = localStorage.getItem('hf_api_key');
       if (savedKey) hfKeyInput.value = savedKey;
       pickRandomTopic();
+      pickRandomPassage();
+      initFaceLandmarker();
     });
 
     hfKeyInput.addEventListener('input', () => {
@@ -421,21 +666,27 @@
       const confidenceScore = wordCount > 10 ? 130 : 60;
       const pronunciationScore = wordCount > 10 ? 135 : 65;
 
-      const totalScore = paceScore + fillerScore + concisenessScore + structureScore + confidenceScore + pronunciationScore;
+      const jawMouthResult = computeJawMouthScore(lastFaceMetrics);
+      const jawMouthScore = jawMouthResult.score;
 
-      document.getElementById('totalScore').textContent = `${totalScore} / 1000`;
+      const totalScore = paceScore + fillerScore + concisenessScore + structureScore + confidenceScore + pronunciationScore + jawMouthScore;
+
+      document.getElementById('totalScore').textContent = `${totalScore} / 1100`;
       document.getElementById('scoreStructure').textContent = `${structureScore} / 250`;
       document.getElementById('scoreConciseness').textContent = `${concisenessScore} / 200`;
       document.getElementById('scoreConfidence').textContent = `${confidenceScore} / 150`;
       document.getElementById('scorePronunciation').textContent = `${pronunciationScore} / 150`;
       document.getElementById('scoreFiller').textContent = `${fillerScore} / 150`;
       document.getElementById('scorePace').textContent = `${paceScore} / 100`;
+      document.getElementById('scoreJawMouth').textContent = `${jawMouthScore} / 100`;
+      document.getElementById('faceTrackNote').textContent = jawMouthResult.note || '';
 
-      // Step 2: Send Text (+ topic) to Main Process for AI Analysis
+      // Step 2: Send Text (+ topic + vision summary) to Main Process for AI Analysis
       const aiBox = document.getElementById('aiAnalysisBox');
       aiBox.textContent = "Generating AI Coach Feedback...";
 
-      const coachResult = await ipcRenderer.invoke('analyze-speech', { transcript: currentText, apiKey, topic: currentTopic });
+      const visionSummary = buildVisionSummary(jawMouthResult);
+      const coachResult = await ipcRenderer.invoke('analyze-speech', { transcript: currentText, apiKey, topic: currentTopic, visionSummary });
 
       if (coachResult.success) {
         aiBox.innerHTML = coachResult.text.replace(/\n/g, '<br>');
@@ -456,6 +707,117 @@
     };
     document.getElementById('unfairBtn').onclick = () => {
       document.getElementById('feedbackResponse').textContent = 'Feedback noted for future tuning.';
+    };
+
+    // ---------- Reading-aloud analysis ----------
+    function normalizeWords(text) {
+      return text.toLowerCase().replace(/[^a-z0-9\s']/g, '').split(/\s+/).filter(Boolean);
+    }
+
+    // Longest-common-subsequence word match: fraction of the reference passage's
+    // words reproduced, in order, in the transcript. A practical proxy for reading
+    // accuracy — note that Whisper's own transcription can smooth over some
+    // mispronunciations, so this measures "read correctly" more than raw phoneme accuracy.
+    function wordMatchRatio(reference, spoken) {
+      const refWords = normalizeWords(reference);
+      const spokenWords = normalizeWords(spoken);
+      if (refWords.length === 0) return 1;
+      const m = refWords.length, n = spokenWords.length;
+      const dp = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
+      for (let i = 1; i <= m; i++) {
+        for (let j = 1; j <= n; j++) {
+          dp[i][j] = refWords[i - 1] === spokenWords[j - 1] ? dp[i - 1][j - 1] + 1 : Math.max(dp[i - 1][j], dp[i][j - 1]);
+        }
+      }
+      return dp[m][n] / m;
+    }
+
+    async function processReadingRecording() {
+      dashboard2.style.display = 'block';
+      const apiKey = hfKeyInput.value.trim();
+
+      const aiBox2 = document.getElementById('aiAnalysisBox2');
+      transcriptBox2.value = "Transcribing audio using Hugging Face Whisper AI...";
+      aiBox2.textContent = "Waiting for transcript...";
+
+      const audioArrayBuffer = await recordedBlob.arrayBuffer();
+      const sttResult = await ipcRenderer.invoke('transcribe-audio', { audioArrayBuffer, apiKey });
+
+      if (!sttResult.success) {
+        transcriptBox2.value = "";
+        aiBox2.textContent = "Speech Transcription Notice: " + sttResult.error;
+        return;
+      }
+
+      const transcribedText = sttResult.text ? sttResult.text.trim() : "";
+      transcriptBox2.value = transcribedText || "No speech recognized in audio file.";
+
+      if (transcribedText) {
+        runReadingMetricsAndCoach(transcribedText);
+      }
+    }
+
+    async function runReadingMetricsAndCoach(currentText) {
+      const durationSec = Math.max(1, ((endTime || Date.now()) - (startTime || Date.now())) / 1000);
+      const apiKey = hfKeyInput.value.trim();
+      const words = currentText.split(/\s+/).filter(w => w.length > 0);
+      const wordCount = words.length;
+      const wpm = Math.round((wordCount / durationSec) * 60);
+
+      let fillerCount = 0;
+      const fillers = ['um', 'uh', 'like', 'you know', 'so', 'actually'];
+      words.forEach(w => { if (fillers.includes(w.toLowerCase())) fillerCount++; });
+
+      const paceScore = Math.max(20, Math.min(100, 100 - Math.abs(140 - wpm)));
+      const fillerScore = Math.max(30, Math.min(150, 150 - (fillerCount * 15)));
+      const confidenceScore = wordCount > 10 ? 130 : 60;
+
+      const matchRatio = wordMatchRatio(currentPassage, currentText);
+      const pronunciationScore = Math.round(Math.max(0, Math.min(1, matchRatio)) * 150);
+
+      const jawMouthResult = computeJawMouthScore(lastFaceMetrics);
+      const jawMouthScore = jawMouthResult.score;
+
+      const totalScore = paceScore + fillerScore + confidenceScore + pronunciationScore + jawMouthScore;
+
+      document.getElementById('totalScore2').textContent = `${totalScore} / 650`;
+      document.getElementById('scorePronunciation2').textContent = `${pronunciationScore} / 150`;
+      document.getElementById('scoreConfidence2').textContent = `${confidenceScore} / 150`;
+      document.getElementById('scoreFiller2').textContent = `${fillerScore} / 150`;
+      document.getElementById('scorePace2').textContent = `${paceScore} / 100`;
+      document.getElementById('scoreJawMouth2').textContent = `${jawMouthScore} / 100`;
+      document.getElementById('faceTrackNote2').textContent = jawMouthResult.note || '';
+
+      const aiBox2 = document.getElementById('aiAnalysisBox2');
+      aiBox2.textContent = "Generating AI Coach Feedback...";
+
+      const visionSummary = buildVisionSummary(jawMouthResult);
+      const coachResult = await ipcRenderer.invoke('analyze-speech', {
+        transcript: currentText,
+        apiKey,
+        referenceText: currentPassage,
+        visionSummary
+      });
+
+      if (coachResult.success) {
+        aiBox2.innerHTML = coachResult.text.replace(/\n/g, '<br>');
+      } else {
+        aiBox2.textContent = "AI Analysis Error: " + coachResult.error;
+      }
+    }
+
+    reanalyzeBtn2.onclick = () => {
+      const text = transcriptBox2.value.trim();
+      if (text) {
+        runReadingMetricsAndCoach(text);
+      }
+    };
+
+    document.getElementById('fairBtn2').onclick = () => {
+      document.getElementById('feedbackResponse2').textContent = 'Feedback saved!';
+    };
+    document.getElementById('unfairBtn2').onclick = () => {
+      document.getElementById('feedbackResponse2').textContent = 'Feedback noted for future tuning.';
     };
 
     setupCamera();

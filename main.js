@@ -99,28 +99,39 @@ ipcMain.handle('transcribe-audio', async (event, { audioArrayBuffer, apiKey }) =
 });
 
 // IPC Handler: Analyze Transcript using Hugging Face Router
-ipcMain.handle('analyze-speech', async (event, { transcript, apiKey, topic }) => {
+ipcMain.handle('analyze-speech', async (event, { transcript, apiKey, topic, referenceText, visionSummary }) => {
   return new Promise((resolve) => {
     const cleanKey = apiKey ? apiKey.replace(/[^\x00-\x7F]/g, "").trim() : "";
     if (!cleanKey) return resolve({ success: false, error: "Please enter your Hugging Face API key." });
 
-    const topicLine = topic
-      ? `The speaker was given this prompt to respond to: "${topic}". Also judge how well the response addressed that prompt and how well it was structured around it.`
+    let contextLine = "";
+    let cover1 = "topic relevance/structure";
+    if (referenceText) {
+      contextLine = `This is a read-aloud exercise. The speaker was asked to read this passage verbatim: "${referenceText}". Compare the transcript to the passage and note any words that seem skipped, substituted, or mispronounced, plus overall fluency.`;
+      cover1 = "reading accuracy & fluency vs. the passage";
+    } else if (topic) {
+      contextLine = `The speaker was given this prompt to respond to: "${topic}". Also judge how well the response addressed that prompt and how well it was structured around it.`;
+    }
+
+    const visionLine = visionSummary
+      ? ` Camera-based physical delivery data for this take: ${visionSummary}`
       : "";
+
+    const coverPhysical = visionSummary ? ', (3) physical delivery (jaw/mouth control) using the camera data, (4) one concrete fix' : ', (3) one concrete fix';
 
     const postData = JSON.stringify({
       model: "meta-llama/Llama-3.1-8B-Instruct",
       messages: [
         {
           role: "system",
-          content: `You are a speech coach. Be extremely concise: max 4 short bullet points total, no preamble, no restating the transcript. ${topicLine} Cover: (1) topic relevance/structure, (2) delivery (tone, filler words), (3) one concrete fix.`
+          content: `You are a speech coach. Be extremely concise: max 4 short bullet points total, no preamble, no restating the transcript. ${contextLine}${visionLine} Cover: (1) ${cover1}, (2) delivery (tone, filler words)${coverPhysical}.`
         },
         {
           role: "user",
           content: `Transcript: "${transcript}"`
         }
       ],
-      max_tokens: 180
+      max_tokens: 200
     });
 
     const options = {
