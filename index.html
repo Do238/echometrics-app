@@ -317,7 +317,9 @@
     </div>
 
   </div>
-
+  
+  <script src="hud.js"></script>
+  
   <script>
     const { ipcRenderer } = require('electron');
 
@@ -443,11 +445,19 @@
       }
     }
 
+    let lastFaceRun = 0;
+    let lastFaceVideoTime = -1;
+
     function trackFaceFrame() {
       if (!isRecording) return;
-      if (faceLandmarker && preview.readyState >= 2) {
+      const nowMs = performance.now();
+      // Run at most ~20 times a second, and only on new video frames
+      if (faceLandmarker && preview.readyState >= 2 &&
+          nowMs - lastFaceRun >= 50 && preview.currentTime !== lastFaceVideoTime) {
+        lastFaceRun = nowMs;
+        lastFaceVideoTime = preview.currentTime;
         try {
-          const result = faceLandmarker.detectForVideo(preview, performance.now());
+          const result = faceLandmarker.detectForVideo(preview, nowMs);
           const lm = result && result.faceLandmarks && result.faceLandmarks[0];
           if (lm) {
             const mouthWidth = dist2D(lm[LM.MOUTH_LEFT], lm[LM.MOUTH_RIGHT]);
@@ -525,6 +535,10 @@
     const transcriptBox2 = document.getElementById('transcriptBox2');
 
     let mediaRecorder;
+    let audioRecorder;
+    let audioChunks = [];
+    let audioBlob = null;
+    let audioDone = Promise.resolve();
     let recordedChunks = [];
     let recordedBlob = null;
     let isRecording = false;
@@ -538,11 +552,19 @@
 
     async function setupCamera() {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: true,
+          video: { width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 24 } }
+        });
         preview.srcObject = stream;
         const previewReadingEl = document.getElementById('previewReading');
         if (previewReadingEl) previewReadingEl.srcObject = stream;
-        mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
+
+        mediaRecorder = new MediaRecorder(stream, {
+          mimeType: 'video/webm;codecs=vp8,opus',
+          videoBitsPerSecond: 1000000,
+          audioBitsPerSecond: 64000
+        });
 
         mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) recordedChunks.push(e.data); };
         mediaRecorder.onstop = () => {
@@ -555,6 +577,13 @@
           if (recordingMode === 'practice') processAudioAndAnalyze();
           else processReadingRecording();
         };
+
+        // Audio-only copy of the take, used for transcription (much smaller upload than the video)
+        audioRecorder = new MediaRecorder(new MediaStream(stream.getAudioTracks()), {
+          mimeType: 'audio/webm;codecs=opus',
+          audioBitsPerSecond: 32000
+        });
+        audioRecorder.ondataavailable = (e) => { if (e.data.size > 0) audioChunks.push(e.data); };
       } catch (err) {
         status.textContent = 'Error accessing media: ' + err.message;
         status2.textContent = 'Error accessing media: ' + err.message;
@@ -573,6 +602,15 @@
           jawDeltas = [];
           lastJawRel = null;
           startTime = Date.now();
+
+          audioChunks = [];
+          audioDone = new Promise((resolve) => {
+            audioRecorder.onstop = () => {
+              audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+              resolve();
+            };
+          });
+          audioRecorder.start();
           mediaRecorder.start();
 
           isRecording = true;
@@ -582,8 +620,11 @@
           els.downloadBtn.disabled = true;
           els.status.textContent = 'Recording video & audio...';
           trackFaceFrame();
+          window.EchoHud[mode].start(preview.srcObject, () => hfKeyInput.value.trim());
         } else {
           endTime = Date.now();
+          window.EchoHud[mode].stop();
+          audioRecorder.stop();
           mediaRecorder.stop();
 
           isRecording = false;
@@ -630,8 +671,9 @@
       transcriptBox.value = "Transcribing audio using Hugging Face Whisper AI...";
       aiBox.textContent = "Waiting for transcript...";
 
-      // Step 1: Send Audio Buffer to Main Process for Whisper Speech Recognition
-      const audioArrayBuffer = await recordedBlob.arrayBuffer();
+      // Step 1: Send the audio-only recording to the Main Process for Whisper
+      await audioDone;
+      const audioArrayBuffer = await (audioBlob || recordedBlob).arrayBuffer();
       const sttResult = await ipcRenderer.invoke('transcribe-audio', { audioArrayBuffer, apiKey });
 
       if (!sttResult.success) {
@@ -740,7 +782,8 @@
       transcriptBox2.value = "Transcribing audio using Hugging Face Whisper AI...";
       aiBox2.textContent = "Waiting for transcript...";
 
-      const audioArrayBuffer = await recordedBlob.arrayBuffer();
+      await audioDone;
+      const audioArrayBuffer = await (audioBlob || recordedBlob).arrayBuffer();
       const sttResult = await ipcRenderer.invoke('transcribe-audio', { audioArrayBuffer, apiKey });
 
       if (!sttResult.success) {
