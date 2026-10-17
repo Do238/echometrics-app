@@ -1,10 +1,13 @@
 const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
-const https = require('https');
 const { getTemplate } = require('./src/shared/templates');
+const localAI = require('./src/main/local-ai');
 
 let mainWindow;
+
+// Where downloaded AI models are stored (e.g. C:\Users\you\AppData\Roaming\echometrics-app\models)
+const modelCacheDir = () => path.join(app.getPath('userData'), 'models');
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -21,6 +24,10 @@ function createWindow() {
 
 app.whenReady().then(() => {
   createWindow();
+
+  // Start loading Whisper in the background so the first take isn't slow.
+  // The first run ever also downloads the model (~150 MB) into the app's data folder.
+  localAI.getTranscriber(modelCacheDir()).catch((e) => console.error('Whisper failed to load:', e));
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
@@ -50,142 +57,57 @@ ipcMain.handle('convert-to-mp4', async (event, arrayBuffer) => {
   }
 });
 
-// Helper: POST a buffer over HTTPS, always resolves (never throws)
-function postBuffer({ hostname, path, headers }, body) {
-  return new Promise((resolve) => {
-    const req = https.request(
-      { hostname, path, method: 'POST', headers: { ...headers, 'Content-Length': body.length } },
-      (res) => {
-        let data = '';
-        res.on('data', (c) => { data += c; });
-        res.on('end', () => resolve({ status: res.statusCode, data }));
-      }
-    );
-    req.setTimeout(60000, () => req.destroy(new Error('Request timed out')));
-    req.on('error', (e) => resolve({ status: 0, data: '', error: e.message }));
-    req.write(body);
-    req.end();
-  });
-}
+// IPC Handler: Transcribe Audio with Whisper, running locally
+ipcMain.handle('transcribe-audio', async (event, { audioArrayBuffer }) => {
+  try {
+    const text = await localAI.transcribe(Buffer.from(audioArrayBuffer), modelCacheDir());
+    return { success: true, text };
+  } catch (e) {
+    console.error('Transcription failed:', e);
+    return { success: false, error: 'Local Whisper error: ' + e.message };
+  }
+});
 
-// IPC Handler: Transcribe Audio using Hugging Face Whisper AI (with retries)
-ipcMain.handle('transcribe-audio', async (event, { audioArrayBuffer, apiKey }) => {
-  const cleanKey = apiKey ? apiKey.replace(/[^\x00-\x7F]/g, '').trim() : '';
-  if (!cleanKey) return { success: false, error: 'Please enter your Hugging Face API key.' };
+// IPC Handler: Analyze Transcript with the AI coach, running locally in Ollama
+ipcMain.handle('analyze-speech', async (event, { transcript, topic, referenceText, visionSummary, templateId }) => {
+  const template = getTemplate(templateId);
 
-  const buffer = Buffer.from(audioArrayBuffer);
-  const target = {
-    hostname: 'router.huggingface.co',
-    path: '/hf-inference/models/openai/whisper-large-v3-turbo',
-    headers: {
-      'Authorization': `Bearer ${cleanKey}`,
-      'Content-Type': 'audio/webm',
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
-    }
-  };
-
-  // Retry on network errors, rate limits, and cold starts
-  let res;
-  for (let attempt = 0; attempt < 3; attempt++) {
-    res = await postBuffer(target, buffer);
-    if (![0, 429, 502, 503, 504].includes(res.status)) break;
-    await new Promise((r) => setTimeout(r, 2500 * (attempt + 1)));
+  let contextLine = "";
+  let cover1 = "topic relevance/structure";
+  if (referenceText) {
+    contextLine = `This is a read-aloud exercise. The speaker was asked to read this passage verbatim: "${referenceText}". Compare the transcript to the passage and note any words that seem skipped, substituted, or mispronounced, plus overall fluency.`;
+    cover1 = "reading accuracy & fluency vs. the passage";
+  } else if (topic) {
+    contextLine = `The speaker was given this prompt to respond to: "${topic}". Also judge how well the response addressed that prompt and how well it was structured around it.`;
   }
 
-  if (res.status === 0) return { success: false, error: 'HTTPS Network Connection Error: ' + res.error };
-  if (res.status === 503) return { success: false, error: 'Whisper model is warming up on free servers. Please try again in 15 seconds.' };
-  if (res.status === 429) return { success: false, error: 'Hugging Face rate limit reached. Wait a minute and try again.' };
+  // Speech-mode criteria (Practice tab only; read-aloud ignores the mode)
+  const modeLine = (!referenceText && template.coachFocus) ? ` ${template.coachFocus}` : "";
+
+  const visionLine = visionSummary
+    ? ` Camera-based physical delivery data for this take: ${visionSummary}`
+    : "";
+
+  const coverPhysical = visionSummary ? ', (3) physical delivery (jaw/mouth control) using the camera data, (4) one concrete fix' : ', (3) one concrete fix';
+
+  const messages = [
+    {
+      role: "system",
+      content: `You are a speech coach. Be extremely concise: max 4 short bullet points total, no preamble, no restating the transcript. ${contextLine}${modeLine}${visionLine} Cover: (1) ${cover1}, (2) delivery (tone, filler words)${coverPhysical}.`
+    },
+    {
+      role: "user",
+      content: `Transcript: "${transcript}"`
+    }
+  ];
 
   try {
-    const parsed = JSON.parse(res.data);
-    if (res.status !== 200) {
-      return { success: false, error: `Hugging Face STT Error (${res.status}): ${parsed.error || parsed.message || res.data}` };
-    }
-    return { success: true, text: parsed.text || '' };
+    const text = await localAI.chat(messages, 200);
+    return { success: true, text: text || "Response text empty." };
   } catch (e) {
-    return { success: false, error: 'Error parsing Whisper response: ' + e.message };
+    return { success: false, error: e.message };
   }
 });
 
-// IPC Handler: Analyze Transcript using Hugging Face Router
-ipcMain.handle('analyze-speech', async (event, { transcript, apiKey, topic, referenceText, visionSummary, templateId }) => {
-  return new Promise((resolve) => {
-    const cleanKey = apiKey ? apiKey.replace(/[^\x00-\x7F]/g, "").trim() : "";
-    if (!cleanKey) return resolve({ success: false, error: "Please enter your Hugging Face API key." });
-
-    const template = getTemplate(templateId);
-
-    let contextLine = "";
-    let cover1 = "topic relevance/structure";
-    if (referenceText) {
-      contextLine = `This is a read-aloud exercise. The speaker was asked to read this passage verbatim: "${referenceText}". Compare the transcript to the passage and note any words that seem skipped, substituted, or mispronounced, plus overall fluency.`;
-      cover1 = "reading accuracy & fluency vs. the passage";
-    } else if (topic) {
-      contextLine = `The speaker was given this prompt to respond to: "${topic}". Also judge how well the response addressed that prompt and how well it was structured around it.`;
-    }
-
-    // Speech-mode criteria (Practice tab only; read-aloud ignores the mode)
-    const modeLine = (!referenceText && template.coachFocus) ? ` ${template.coachFocus}` : "";
-
-    const visionLine = visionSummary
-      ? ` Camera-based physical delivery data for this take: ${visionSummary}`
-      : "";
-
-    const coverPhysical = visionSummary ? ', (3) physical delivery (jaw/mouth control) using the camera data, (4) one concrete fix' : ', (3) one concrete fix';
-
-    const postData = JSON.stringify({
-      model: "meta-llama/Llama-3.1-8B-Instruct",
-      messages: [
-        {
-          role: "system",
-          content: `You are a speech coach. Be extremely concise: max 4 short bullet points total, no preamble, no restating the transcript. ${contextLine}${modeLine}${visionLine} Cover: (1) ${cover1}, (2) delivery (tone, filler words)${coverPhysical}.`
-        },
-        {
-          role: "user",
-          content: `Transcript: "${transcript}"`
-        }
-      ],
-      max_tokens: 200
-    });
-
-    const options = {
-      hostname: 'router.huggingface.co',
-      path: '/v1/chat/completions',
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${cleanKey}`,
-        'Content-Type': 'application/json',
-        'Content-Length': Buffer.byteLength(postData),
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
-      }
-    };
-
-    const req = https.request(options, (res) => {
-      let data = '';
-      res.on('data', (chunk) => { data += chunk; });
-      res.on('end', () => {
-        try {
-          if (res.statusCode === 503) {
-            return resolve({ success: false, error: "AI Coach model is warming up on free servers. Please try again in 15 seconds." });
-          }
-          const parsed = JSON.parse(data);
-          if (res.statusCode !== 200) {
-            const errMsg = parsed.error?.message || parsed.error || parsed.message || JSON.stringify(parsed);
-            return resolve({ success: false, error: `Hugging Face LLM Error (${res.statusCode}): ${errMsg}` });
-          }
-          const text = parsed.choices?.[0]?.message?.content;
-          resolve({ success: true, text: text || "Response text empty." });
-        } catch (e) {
-          resolve({ success: false, error: "Error parsing AI Coach response: " + e.message });
-        }
-      });
-    });
-
-    req.on('error', (e) => {
-      resolve({ success: false, error: "HTTPS Network Connection Error: " + e.message });
-    });
-
-    req.write(postData);
-    req.end();
-  });
-});
+// Storytelling course: AI coach feedback for course recordings
+require('./src/main/course-ipc').register(ipcMain);
