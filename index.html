@@ -217,15 +217,7 @@
           <div class="total-score" id="totalScore">0 / 1100</div>
         </div>
 
-        <div class="score-grid">
-          <div class="score-card"><h4>Structure</h4><p id="scoreStructure">0 / 250</p></div>
-          <div class="score-card"><h4>Conciseness</h4><p id="scoreConciseness">0 / 200</p></div>
-          <div class="score-card"><h4>Confidence</h4><p id="scoreConfidence">0 / 150</p></div>
-          <div class="score-card"><h4>Pronunciation</h4><p id="scorePronunciation">0 / 150</p></div>
-          <div class="score-card"><h4>Filler Rate</h4><p id="scoreFiller">0 / 150</p></div>
-          <div class="score-card"><h4>Pace</h4><p id="scorePace">0 / 100</p></div>
-          <div class="score-card"><h4>Jaw &amp; Mouth</h4><p id="scoreJawMouth">0 / 100</p></div>
-        </div>
+        <div class="score-grid" id="scoreGrid"></div>
         <p id="faceTrackNote" style="font-size: 12px; color: #64748b; margin: -12px 0 20px 0; text-align: center;"></p>
 
         <div class="section-title">AI Transcribed Text (Editable)</div>
@@ -281,13 +273,7 @@
           <div class="total-score" id="totalScore2">0 / 650</div>
         </div>
 
-        <div class="score-grid">
-          <div class="score-card"><h4>Pronunciation</h4><p id="scorePronunciation2">0 / 150</p></div>
-          <div class="score-card"><h4>Confidence</h4><p id="scoreConfidence2">0 / 150</p></div>
-          <div class="score-card"><h4>Filler Rate</h4><p id="scoreFiller2">0 / 150</p></div>
-          <div class="score-card"><h4>Pace</h4><p id="scorePace2">0 / 100</p></div>
-          <div class="score-card"><h4>Jaw &amp; Mouth</h4><p id="scoreJawMouth2">0 / 100</p></div>
-        </div>
+        <div class="score-grid" id="scoreGrid2"></div>
         <p id="faceTrackNote2" style="font-size: 12px; color: #64748b; margin: -12px 0 20px 0; text-align: center;"></p>
 
         <div class="section-title">AI Transcribed Text (Editable)</div>
@@ -318,10 +304,18 @@
 
   </div>
   
-  <script src="hud.js"></script>
+  
   
   <script>
     const { ipcRenderer } = require('electron');
+
+    // ---------- Feature modules ----------
+    const bus = require('./src/renderer/bus');
+    const scoring = require('./src/renderer/scoring');
+    const { renderScoreGrid } = require('./src/renderer/score-view');
+    const templatePicker = require('./src/renderer/features/template-picker');
+    require('./src/renderer/features/hud').init(); // before the picker: it adds the Settings field
+    templatePicker.init();
 
     // ---------- Tabs ----------
     document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -690,51 +684,38 @@
       }
     }
 
-    async function runMetricsAndCoach(currentText) {
+        async function runMetricsAndCoach(currentText) {
       const durationSec = Math.max(1, ((endTime || Date.now()) - (startTime || Date.now())) / 1000);
       const apiKey = hfKeyInput.value.trim();
-      const words = currentText.split(/\s+/).filter(w => w.length > 0);
-      const wordCount = words.length;
-      const wpm = Math.round((wordCount / durationSec) * 60);
-
-      let fillerCount = 0;
-      const fillers = ['um', 'uh', 'like', 'you know', 'so', 'actually'];
-      words.forEach(w => { if (fillers.includes(w.toLowerCase())) fillerCount++; });
-
-      const paceScore = Math.max(20, Math.min(100, 100 - Math.abs(140 - wpm)));
-      const fillerScore = Math.max(30, Math.min(150, 150 - (fillerCount * 15)));
-      const concisenessScore = Math.min(200, Math.max(80, 200 - Math.floor(wordCount / 10)));
-      const structureScore = Math.min(250, 150 + Math.floor(wordCount / 2));
-      const confidenceScore = wordCount > 10 ? 130 : 60;
-      const pronunciationScore = wordCount > 10 ? 135 : 65;
-
+      const template = templatePicker.getCurrent();
       const jawMouthResult = computeJawMouthScore(lastFaceMetrics);
-      const jawMouthScore = jawMouthResult.score;
 
-      const totalScore = paceScore + fillerScore + concisenessScore + structureScore + confidenceScore + pronunciationScore + jawMouthScore;
-
-      document.getElementById('totalScore').textContent = `${totalScore} / 1100`;
-      document.getElementById('scoreStructure').textContent = `${structureScore} / 250`;
-      document.getElementById('scoreConciseness').textContent = `${concisenessScore} / 200`;
-      document.getElementById('scoreConfidence').textContent = `${confidenceScore} / 150`;
-      document.getElementById('scorePronunciation').textContent = `${pronunciationScore} / 150`;
-      document.getElementById('scoreFiller').textContent = `${fillerScore} / 150`;
-      document.getElementById('scorePace').textContent = `${paceScore} / 100`;
-      document.getElementById('scoreJawMouth').textContent = `${jawMouthScore} / 100`;
+      const result = scoring.scoreSpeech({
+        mode: 'practice', text: currentText, durationSec, template, face: jawMouthResult
+      });
+      renderScoreGrid(document.getElementById('scoreGrid'), document.getElementById('totalScore'), result);
       document.getElementById('faceTrackNote').textContent = jawMouthResult.note || '';
 
-      // Step 2: Send Text (+ topic + vision summary) to Main Process for AI Analysis
+      // Step 2: Send Text (+ topic + vision summary + speech mode) to Main Process for AI Analysis
       const aiBox = document.getElementById('aiAnalysisBox');
       aiBox.textContent = "Generating AI Coach Feedback...";
 
       const visionSummary = buildVisionSummary(jawMouthResult);
-      const coachResult = await ipcRenderer.invoke('analyze-speech', { transcript: currentText, apiKey, topic: currentTopic, visionSummary });
+      const coachResult = await ipcRenderer.invoke('analyze-speech', {
+        transcript: currentText, apiKey, topic: currentTopic, visionSummary, templateId: template.id
+      });
 
       if (coachResult.success) {
         aiBox.innerHTML = coachResult.text.replace(/\n/g, '<br>');
       } else {
         aiBox.textContent = "AI Analysis Error: " + coachResult.error;
       }
+
+      bus.emit('session:complete', {
+        mode: 'practice', templateId: template.id, text: currentText, durationSec,
+        scores: result, coachText: coachResult.success ? coachResult.text : null,
+        topic: currentTopic, finishedAt: Date.now()
+      });
     }
 
     reanalyzeBtn.onclick = () => {
@@ -800,35 +781,16 @@
       }
     }
 
-    async function runReadingMetricsAndCoach(currentText) {
+        async function runReadingMetricsAndCoach(currentText) {
       const durationSec = Math.max(1, ((endTime || Date.now()) - (startTime || Date.now())) / 1000);
       const apiKey = hfKeyInput.value.trim();
-      const words = currentText.split(/\s+/).filter(w => w.length > 0);
-      const wordCount = words.length;
-      const wpm = Math.round((wordCount / durationSec) * 60);
-
-      let fillerCount = 0;
-      const fillers = ['um', 'uh', 'like', 'you know', 'so', 'actually'];
-      words.forEach(w => { if (fillers.includes(w.toLowerCase())) fillerCount++; });
-
-      const paceScore = Math.max(20, Math.min(100, 100 - Math.abs(140 - wpm)));
-      const fillerScore = Math.max(30, Math.min(150, 150 - (fillerCount * 15)));
-      const confidenceScore = wordCount > 10 ? 130 : 60;
-
-      const matchRatio = wordMatchRatio(currentPassage, currentText);
-      const pronunciationScore = Math.round(Math.max(0, Math.min(1, matchRatio)) * 150);
-
       const jawMouthResult = computeJawMouthScore(lastFaceMetrics);
-      const jawMouthScore = jawMouthResult.score;
 
-      const totalScore = paceScore + fillerScore + confidenceScore + pronunciationScore + jawMouthScore;
-
-      document.getElementById('totalScore2').textContent = `${totalScore} / 650`;
-      document.getElementById('scorePronunciation2').textContent = `${pronunciationScore} / 150`;
-      document.getElementById('scoreConfidence2').textContent = `${confidenceScore} / 150`;
-      document.getElementById('scoreFiller2').textContent = `${fillerScore} / 150`;
-      document.getElementById('scorePace2').textContent = `${paceScore} / 100`;
-      document.getElementById('scoreJawMouth2').textContent = `${jawMouthScore} / 100`;
+      const result = scoring.scoreSpeech({
+        mode: 'reading', text: currentText, durationSec, face: jawMouthResult,
+        referenceMatch: wordMatchRatio(currentPassage, currentText)
+      });
+      renderScoreGrid(document.getElementById('scoreGrid2'), document.getElementById('totalScore2'), result);
       document.getElementById('faceTrackNote2').textContent = jawMouthResult.note || '';
 
       const aiBox2 = document.getElementById('aiAnalysisBox2');
@@ -836,10 +798,7 @@
 
       const visionSummary = buildVisionSummary(jawMouthResult);
       const coachResult = await ipcRenderer.invoke('analyze-speech', {
-        transcript: currentText,
-        apiKey,
-        referenceText: currentPassage,
-        visionSummary
+        transcript: currentText, apiKey, referenceText: currentPassage, visionSummary
       });
 
       if (coachResult.success) {
@@ -847,6 +806,12 @@
       } else {
         aiBox2.textContent = "AI Analysis Error: " + coachResult.error;
       }
+
+      bus.emit('session:complete', {
+        mode: 'reading', templateId: 'general', text: currentText, durationSec,
+        scores: result, coachText: coachResult.success ? coachResult.text : null,
+        reference: currentPassage, finishedAt: Date.now()
+      });
     }
 
     reanalyzeBtn2.onclick = () => {

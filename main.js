@@ -2,6 +2,7 @@ const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const https = require('https');
+const { getTemplate } = require('./src/shared/templates');
 
 let mainWindow;
 
@@ -107,10 +108,12 @@ ipcMain.handle('transcribe-audio', async (event, { audioArrayBuffer, apiKey }) =
 });
 
 // IPC Handler: Analyze Transcript using Hugging Face Router
-ipcMain.handle('analyze-speech', async (event, { transcript, apiKey, topic, referenceText, visionSummary }) => {
+ipcMain.handle('analyze-speech', async (event, { transcript, apiKey, topic, referenceText, visionSummary, templateId }) => {
   return new Promise((resolve) => {
     const cleanKey = apiKey ? apiKey.replace(/[^\x00-\x7F]/g, "").trim() : "";
     if (!cleanKey) return resolve({ success: false, error: "Please enter your Hugging Face API key." });
+
+    const template = getTemplate(templateId);
 
     let contextLine = "";
     let cover1 = "topic relevance/structure";
@@ -120,6 +123,9 @@ ipcMain.handle('analyze-speech', async (event, { transcript, apiKey, topic, refe
     } else if (topic) {
       contextLine = `The speaker was given this prompt to respond to: "${topic}". Also judge how well the response addressed that prompt and how well it was structured around it.`;
     }
+
+    // Speech-mode criteria (Practice tab only; read-aloud ignores the mode)
+    const modeLine = (!referenceText && template.coachFocus) ? ` ${template.coachFocus}` : "";
 
     const visionLine = visionSummary
       ? ` Camera-based physical delivery data for this take: ${visionSummary}`
@@ -132,7 +138,7 @@ ipcMain.handle('analyze-speech', async (event, { transcript, apiKey, topic, refe
       messages: [
         {
           role: "system",
-          content: `You are a speech coach. Be extremely concise: max 4 short bullet points total, no preamble, no restating the transcript. ${contextLine}${visionLine} Cover: (1) ${cover1}, (2) delivery (tone, filler words)${coverPhysical}.`
+          content: `You are a speech coach. Be extremely concise: max 4 short bullet points total, no preamble, no restating the transcript. ${contextLine}${modeLine}${visionLine} Cover: (1) ${cover1}, (2) delivery (tone, filler words)${coverPhysical}.`
         },
         {
           role: "user",
